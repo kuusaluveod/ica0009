@@ -1,0 +1,808 @@
+Windows admin ICA0009
+
+Windowsi install
+
+Standard version - core (CLI only).
+Standard version desktop - gui
+
+***VM kloonimine***
+kloonitava VM vdh copyda uue masina nimelisse kausta + nimevahetused.
+uue hd asemel valida copytud vdh
+kloonimisel vaja vahetada SID (security ID)
+uuel masinal:
+C:/Windows/System32/Sysprep
+run sysprep as admin
+Enter System Out-of-Box experience
+(enable generalize)
+Reboot
+
+***V-Switch***
+Virtual Switch Manager
+new switch - 
+external - lai maailm, internal - vm'id + host, private - ainult vmid
+VM'il muuta Network Adapter - Virtual Switch
+
+OS'is - Server Manager - Local Server - Ethernet - properties 
+uncheck IPv6, IPv4 - properties
+ip address ja mask (private ja internal puhul pole gw dns server vaja))
+powershell> ipconfig
+APIPA - määrab esiaglse ip(168.254.´´´.´´´´)
+powershell> Test-NetConnection -ComputerName 10.0.0.1 (pingitava hosti ip)
+(by default - tulemyyr ei lase l2bi)
+server manager - firewall -w d firewall properties - fw state: OFF
+
+
+***NIC teaming - Kahe eth pesaga***
+settings - add hw: network adapter
+server manager - nic teaming
+new team - check adapters - ok
+2 kaarti -> 1 loogiline võrgukaart
+Network connections - Team - properties - määra ipv4 ja mask
+
+
+***RDP - remote desktop connections ***
+
+
+https://vcsa.itcollege.ee
+
+
+rdp konto
+.\administrator
+Kala123
+
+
+***STAATILINE IP***
+Server Manager - Local Server - Ethernet0
+properties- ipv4 - properties
+
+subnet mask: 255.255.252.0
+laboris gw: 192.168.183.254
+
+
+***Local kasutaja***
+Computer Management - Local Users and Groups
+
+Groups
+Administrators - TOP TIER
+Users - BOTTOM TIER
+
+***Serveri nimi***
+Computer Name:
+Change - UNI-ID
+
+node c - ats.kiisa-dc01
+node b - ats.kiisa-srv1
+node a - ats.kiisa-srv2
+
+
+***Command Line***
+RDP
+SConfig
+
+Network - 8)
+Network adapter settings - 1) set network adapter address
+static
+
+new user
+$Password = Read-Host -AsSecureString
+ps > New-LocalUser "NEW USERNAME" -Password $Password
+
+add to group
+ps > Add-LocalGroupMember -Group "Administrators" -Member "NEW USERNAME"
+
+või add local admin sconfigist
+
+computer name
+
+
+***DOMEEN***
+Active Directory
+NODE C - DC - Domeenikontroller
+
+Server Manager - Manage - Add Roles and Features
+Role-Based - uus roll
+Active Directory Domain Services + include management tools -  Add Features
+Install
+
+Local Server - Ethernet - properties - ipv4- properties
+DNS server - DC (NODE C) ip address
+
+Promote this server to a domain controller
+
+forest - domeenide ja alamdomeenide kogum
+
+root domain - uni-id.ee
+
+dns server
+gc
+recovery pw
+install
+
+Domeeni login
+user:
+DOMEEN.EE\administrator
+
+Active Directory Users and Computers
+
+Domeen.ee
+Domain Admins
+
+
+teised serverid
+
+DNS server ip address (dc ip)
+
+
+Workgroup - change
+Member of Domain: 
+
+login domeeni admin kontoga
+domain.ee\administrator
+
+
+CLI
+sconfig
+network settings - set dns servers
+
+dc ip address
+
+domain/workgroup
+
+join Domain
+domain.ee
+domain.ee\administrator
+
+***Kontod Grupid Ligipääsud***
+Domain Controller -
+Active Directory  Users and Computers
+Users - parem click - new user
+kasutaja1 - parool
+
+new group
+Group1
+global - security
+
+Group1 - properties - members
+add - kasutaja1
+
+srv1
+rdp õigused kasutaja1'le ja tema grupile
+Computer Management - local users and groups - groups
+remote desktop users - add - Group1
+
+rdp for multiple users 
+Computer Configuration - Administrative Templates - Windows Components - Remote Desktop Services - Remote Desktop Session Host - Connections - 
+Set Restrict Remote Desktop Services user to a single Remote Desktop Services session to Disabled
+
+
+
+C:/TEST/test.txt (not empty)
+properties - security
+advanced
+disable inheritance - keela pärimine
+convert inherited permissions....
+apply
+
+TEST folder properties
+edit
+add
+Group1
+read & execute
+Read
+
+
+TEST folder properties - security
+rm Users group
+
+
+***Võrgukaust***
+SRV1 - admin
+C:/TEST - properties
+sharing - advanced sharing
+share this folder (kui $ folderi nime taha siis ei ole kaust nähtav)
+
+DC - admin
+network
+//uni-id-srv01
+näitab TEST jagatud kausta
+
+
+***Group Policy ***
+
+Local Computer
+mmc
+file - add/remove snap-ins
+group policy object editor
+add
+Local Computer
+Local Computer Policy all palju valikuid
+
+Kassi pilt wallpaper kõigile
+User configuration -  Administrative Templates - Desktop - Desktop Wallpaper
+enabled
+Wallpaper Name: path
+
+group policy update 
+ps> gpupdate /force
+
+
+Domeeni Group policy
+
+domain controller - admin
+Server Manager - Tools - Group Policy Management
+Forest domain.ee
+domains- domain.ee- group policy objects
+parem click - new - new group policy - 2
+2 - parem click edit - User configuration - Admin. templates - Desktop
+Desktop Wallpaper
+enabled
+Wallpaper Name: path (\\uni-id-srv1\test\2.png - share teise serveri peal)
+
+grupid policyga ei mõju, tuleb siduda vastu organisation unit.
+
+Active Directory Users and Computers
+domeen.ee - right click - new - organizational unit
+KASUTAJAD (disable protect conteiner..)
+kasutaja1
+parem click - move - KASUTAJAD
+
+Group policy Management
+refresh domain.ee
+parem klõps - link existing GPO - 
+2
+
+
+Kasutaja group policy
+new group policy object
+3
+edit
+user conf. - admin templates - desktop - desktop wallpaper
+''-''
+3.png
+
+KASUTAJAD - link to existing GPO - 3
+
+mitme GPO'ga
+Group policy management
+group policy objects - new - group policy -4
+edit - user conf. admin temp - desktop- desktop wallpaper
+''-''
+
+KASUTAJAD - link to existing GPO - 4
+
+kui samale objectil mitu GPO siis läheb linked order järgi
+
+
+order
+1) kasutaja
+2) local policy
+3) domain policy (high)
+4) domain policy (low)
+5) link order
+
+mis policyd mõjuvad
+
+ps> gpresult /r
+
+
+*** known hosts ja ip aadressid ***
+rdp
+SRV1 - domeen Admin
+HOSTS
+open notepad as administrator
+C:Windows/System32/drivers/etc/hosts
+example:
+
+192.168.183.200 SERVER100
+
+DNS
+rdp - DC - domeen admin
+server manager - tools - dns manager
+uni-id-DC01 - Forward Lookup Zones - domeen.ee
+
+nslookup uni-id-srv1 - ip aadressi päring
+
+run as admin 
+ps> ipconfig /registerdns
+
+dns manager
+domeen.ee - parem click - refresh
+
+ühe hosti lisamine
+DNS manager - domeen.ee - parem click - new host
+
+kui nimi korra ära lahendatud, siis jääb dnscache alles, ei pärita uuesti dns (v.a. peale restarti).
+
+tühjenda dns chace
+ipconfig /flushdns
+
+
+ORDER to find IP
+1) HOSTS file
+2) DNS cache
+3) DNS
+
+
+***DNS välisvõrguga***
+
+DNS manager - uni-id-DC01 - properties - 
+root hints - asuvad dns serverid
+forwarders - ise käsitsi DNS serverite lisamiseks et kiirust tõsta
+
+
+***Aliase lisamine***
+
+uni-id-dc01 - admin
+DNS manager - forward lookup zone - domeen.ee
+parem click - new alias
+
+tuleb lisada vastu  hosti
+uni-id-srv1-domeen.ee
+
+jääb paika kui ip muutub
+
+
+***IP aadressi järgi otsimine***
+
+uni-id-dc01 - admin
+DNS manager - Reverse lookup zone - right click - new zone
+
+primary
+replicate to all
+ipv4
+network id: 192.168.183
+allow only secure...
+
+forward lookup zone - domeen.ee
+new host - kukimuki2 - 192.168.183.180
+Create associated pointer PTR record
+
+ps> nslookup 192.168.183.180 - nüüd töötab
+
+*** DHCP ***
+HyperV Manager
+New Virtual Switch - private - Create virtual switch
+ICA0009-PRIVATE
+
+new - virtual machine - ICA0009-SERVER1
+Generation 2
+MEM 4096MB -disable dynamic
+Connection: ICA0009-PRIVATE
+storage size: 20GB
+optical drive: D:Temp/.iso 
+
+Settings 
+CPU - 2
+management - checkpoints - remove automatic checkpoints
+
+
+standard Desktop experience
+
+***KLOON - 
+new - virtual machine - ICA0009-SERVER2
+Generation 2
+''-''
+Attach a virtual disk later
+CPU - 2
+''-''
+cp D:Virtual Machines/ICA0009-SERVER1.vhd D:Virtual Machines/ICA0009-SERVER2.vhdx 
+
+SCSI Controller - Hard Drive - add - D:Virtual Machines/ICA0009-SERVER2.vhdx  (boot order üle vaadata enne - firmware - hard drive esimeseks)
+
+
+
+
+ICA0009-SERVER1
+
+Server Manager - Network Connections / Ethernet - properties - ipv4 - properties - static ip + mask 10.0.0.1 255.255.255.0
+ipv6 disable
+
+Manage - add roles and add tools
+role-based
+ICA0009-SERVER1
+DHCP Server + management tools
+install
+
+
+Server Manager - Tools - DHCP
+ICA0009-SERVER1 - server options - ipv4 - new scope
+Skoop
+10.0.0.20-10.0.0.40
+subnet: (vastama dhcp serverile) 255.255.255.0
+exclusion - erandid
+Lease duration - kui kaua ip aadressi kinni hoiad
+yes, i want to conf. - gw, dns, wins -kui on ja finish
+
+
+ipv4 - scope - address leases
+ip aadressid mis saadud dhcp'lt
+
+ipv4 - scope - reservations
+
+reservation_name - 10.0.0.25 (mingi valitud aadress)
++ MAC
+
+(vaadata srv2 ipconfig /all
+Physical address: 
+reservation toimib mac järgi
+
+peale konfi
+
+ipconfig /release
+ipconfig /renev
+)
+
+***DHCP Filter***
+
+ipv4 - Filters - Deny - new filter
+(blokitava hosti NT. server 2 mac)
+
+Allow - kui ühe lubad, siis teised ligi ei saa
+
+
+
+
+
+*** LOGID ***
+DC - admin
+tools - 
+Event Viewer - Custom view - Server Roles 
+
+Windows logs - üldine stuff arvuti kohta
+* Applications
+* Security - auditing
+* System - OS, kernel, driver, riistvara, 
+
+filter current log
+
+ei saa autentida - Audit Failure
+Task Category - Logon - id v kellaaeg
+
+domeenikontoga logimine - logid on DC peal
+local kontoga logimine - logid lok. masinas
+
+
+Task Manager
+
+Services
+
+Performance monitor - saab salvestama panna
+
+Data collector sets- user defined - new - data collector set
+data - manual-
+performance counter
+* CPU - Processor time
+* Memory - Available MBytes
+* Logicaldisk . Avg Disk queue Length - C: - add
+
+logid salvestab
+%systemdrive/perflogs
+
+Data - start
+
+
+performance monitor - view log data ()
+Log files: Perflogs/Admin/Data/DataColletor01
+
+parem click - add counters - add
+
+avg disk queue length - properties - scale - suuremaks / väiksemaks
+
+zoom to - eralda mingi osa
+
+*** Security ***
+SRV2 - dom.adimn
+Server Manager - tools - Computer Management
+
+Local users and groups - Users
+
+default Administrator konto - pole safe
+
+DC - dom.admin
+
+new users in domain.ee - kasutajad
+user1 + user2
+
+Kasutajad - new object - group
+group - add user1, user2
+
+new group KoikKasutajad - add - group
+
+***Failide ja kataloogide ligipääsud***
+
+SRV2 - dom.admin
+
+C:TEST/ - properties - security
+edit
+remove or add new groups/users
+
+deny alati võidab
+
+
+*** SHARE ***
+DC - domain admin
+Network
+\\uni-id-srv2 
+
+
+C:TEST - properties - sharing
+advanced sharing
+$ nime lõpus peidab ära
+
+by default C: ketas välja jagatud
+//masin-srv/c$
+
+
+*** Tulemüür ***
+
+välja liiklust by default ei kontrollita
+sissetulevat piiratakse
+
+SRV2 - domain admin
+
+Windows Defender Firewall
+advanced settings
+
+3 Profiili
+Domain profile - host on domeenis, vähemalt 1 domain controller võrgus
+
+Private profile - host pole võrgus, domain controller pole kättesaadav
+
+Public profile - host on võrgus, domain controller pole kättesaadav
+
+Windows defender firewall properties - 
+
+rdp - port 3389
+https 443
+
+mis porte kuulab?
+
+ps> netstat -a
+
+nt port 47001
+
+DC1 - dom.adm
+ps> test-netconnection -ComputerName uni-id-srv2 -port 47001
+
+test failed
+
+SRV2 
+inbound rules - new rule - port
+TCP - 47001
+allow või keela
+
+best practice - kõikidele profiilidele korraga
+nimi: 47001
+success - port avatud
+
+
+
+47001 - properties
+Scope - subnet või host kes saab ligi
+alati määrata ära, ei tohi olla kõigile lahti
+
+
+*** Applocker ***
+
+DC1 - dom admin
+tools - group policy management
+
+group policy object - new - Applocker
+
+AD - domeen.ee - new organizational unit
+
+SERVERID
+
+SRV1 ja SRV2 Computers -> SERVERID
+
+Applocker - edit
+Computer configu - policies - windows settings -
+Security settings - System Services -  application identity
+automatic 
+et ise tööle hakkaks
+
+.. Windows settings - Security settings - Application Control policies - Applocker
+
+executable - failid mida jooksutada 
+installerid - driverid, applications, 
+scripts - 
+packaged app rules - ostetud tarkvarad
+
+
+audit only - võimalik jälgida kes mida jooksutab
+enforce rules - pane kinni
+
+executable - 
+create default rules
+
+create new rule
+
+path: nt calc - C:Windows/System32/calc.exe
+
+SERVERID - link an existing GPO - Applocker
+
+Security filtering - saab filtreerida grupist sees
+
+Event Viewer - Applications and Services Logs
+Microsoft - Windows - Applocker - exe and dll
+
+ilmub warning logisse kui audit
+
+
+*** rdweb ***
+
+srv1
+server manager
+manage - add roles -remote desktop  
+session based - 
+
+add from server pool ->
+
+teeb restart
+
+remote desktop services -collections
+create collection - name:Raamatupidamine
+publish remoteapp programs - calc - saab kaugelt calc kasutada
+
+
+
+***HTTPS - IIS***
+uni-id-srv1.domeen.ee/rdweb
+
+saab teate et pole safe
+
+srv1 - loc.admin
+mmc - add remove snap in
+certificates - computer account
+
+Certificates - Personal - Certificates
+
+default certile delete
+
+ps> New-SelfSignedCertificate - DnsName ''uni-id-srv1.domeen.ee'' -CertStoreLocation ''cert:LocalMachine\My''
+
+Server manager - tools - IIS manager
+server certificates
+* default web site - bindings - https 443 - edit
+ssl certificate - self signed certificate
+
+ms veebiserver
+
+DC - 
+mmc
+add/remove snap-ins - certificates
+Computer - local
+Trusted Root Cert Authorities -
+
+Srv1 - 
+certificates - personal - certificates - all tasks - export
+
+password
+
+jagatud kausta
+C:TEST/cert.pfx
+
+DC-s copy lokaalsesse serverisse C:Cert/cert.pfx
+
+Server Manager - group policy management 
+domains - domeen.ee
+group policy object - new - certificate
+certificate - edit - computer configuration - policies - windows settings - security - public key policies - trusted root certification authorities
+
+parem click - import - browse(all files) - C:Cert/cert.vpx
+
+Group Policy management - domain - domeen.ee - link existing GPO
+- certificate
+
+ps> gpudpate /force
+
+
+***DFS - Distributed file system***
+
+data replikeerimine mitmel saidil
+
+DC - dom adm
+
+Namespace
+
+Server manager - Manage - Add Roles and Features
+Role based
+File and iSCSI services - DFS namespaces + management tools
+install
+
+
+
+SRV1
+server manager - manage - add role - role based
+file and storage services - file and iscsi services - dfs namespaces + management tools
+
+
+SRV2 (cli)
+ps> Install-WindowsFeature ''FS-DFS-Replication''
+
+
+DC
+server manager - tools - dfs management
+
+namespaces - new namespace - \\DC
+nt. Files
+domain based
+Files - new folder - Dokumendid
+add target \\srv1\Dokumendid
+
+srv1 ja srv2 vaja teha c kettale shared folder
+ps> New-SmbShare -Name ''Dokumendid'' -Path ''C:\Dokumendid\''
+
+
+\\domeen.ee\namespace\Dokumendid
+
+
+replication
+namespaces -
+add target \\srv2\Dokumendid
+replicate - yes
+
+
+*** ISCSI ***
+
+DC01
+Server manager - tools - add roles - role based
+file and storage services - file and iscsi services - ISCSI target services
+
+Server manager - Files and Storage Services (vasakul) - iSCSI
+
+create virtual disk
+C:
+Name: VD1
+
+target: TARGET1 (kuhu pöördutakse et kettaid kasutada)
+
+Access: SRV1, SRV2
+
+CHAP - lives jah, testis ei
+
+SRV1
+Server manager - tools - iSCSI initiator
+Target: DC01 (või ip)
+
+SRV2
+ps> iscsicpl
+
+ps> Get-PhysicalDisk
+
+
+***high availability - failover cluster***
+
+SRV1
+Server manager - manage - add roles and features
+role based - features (failover clustering) + management tools
+install
+
+SRV2
+ps> Install-WindowsFeature Failover-Clustering
+
+SRV1 - Disk 1 (dfs) - parem click - online - parem click - initialize disk
+
+GPT
+
+parem click - new volume
+do not assign drive letter
+
+server manager - tools - failover clu manager
+validate configuration - clu serverid peaks olema sarnased
+
+create cluster
+
+nimi + eraldi ip aadress
+
+
+print spooleri install core
+SRV2
+ps>  Install-WindowsFeature Print-Services
+
+
+SRV1
+failover cluster management
+cluster - roles - configure role
+generic service - printspooler
+access point - Spooler - vaba ip
